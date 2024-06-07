@@ -1,28 +1,3 @@
-# Pitcher
-
-![Pitcher Logo](link-to-your-logo.png)
-
-Pitcher is an open-source API caller tool designed to simplify the process of making HTTP requests and testing APIs. Similar to Postman, it provides a user-friendly programatic interface for crafting requests, inspecting responses, and organizing your API workflow.
-
-It's Golang code centric, with no UI, no versioning and no copy and pasting. The real developer productivity tool.
-
-## Features
-
-- **User-Friendly Interface**: Intuitive UI makes it easy to create and send HTTP requests.
-- **Multiple Request Methods**: Support for various HTTP methods including GET, POST, PUT, DELETE, etc.
-- **Environment Variables**: Define and utilize environment variables for flexible testing.
-- **Authentication**: Support for different authentication methods including Basic Auth, OAuth, JWT, etc.
-- **Logs**: Support for different authentication methods including Basic Auth, OAuth, JWT, etc.
-
-## Installation
-
-- Option1: To install Pitcher, simply clone the repository and update the "cmd/main.go" to your needs or
-- Option2: Using go get
-```go get github.com/zamariola/pitcher```
-
-and the create the project importing it
-
-```go
 package main
 
 import (
@@ -36,13 +11,20 @@ var local = map[string]string{
 	"host": "https://jsonplaceholder.typicode.com",
 }
 
+var dev = map[string]string{
+	"host": "https://SOME_DEV_URL.typicode.com",
+}
+
 func main() {
+
+	// Get the map of parameters for the desired environment
+	envParameters := parametersFromEnv()
 
 	// Define the client with the global processors
 	client := pitcher.NewClientWithProcessors(
 
 		//Read and write session that expires once it finishes
-		pitcher.NewMemoryRWSession(local),
+		pitcher.NewMemoryRWSession(envParameters),
 
 		//Slice of global (every request) Pre Processors that set ups the session and variables
 		//if neeeded
@@ -130,32 +112,16 @@ func main() {
 	}
 }
 
-```
+func parametersFromEnv() map[string]string {
+	envVar := flag.String("env", "local", "defines environment name to be used to run the calls")
+	flag.Parse()
 
+	env := local
 
-## Contributing
-
-We welcome contributions from the community! If you'd like to contribute to Pitcher, please follow these steps:
-
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/improvement`).
-3. Make your changes.
-4. Commit your changes (`git commit -am 'Add new feature'`).
-5. Push to the branch (`git push origin feature/improvement`).
-6. Create a new Pull Request.
-
-Please make sure to read our [Contribution Guidelines](link-to-contribution-guidelines) before submitting your pull request.
-
-## Support
-
-If you encounter any issues or have any questions about Pitcher, feel free to [open an issue](https://github.com/zamariola/pitcher/issues) on GitHub.
-
-## License
-
-Pitcher is licensed under the [MIT License](link-to-license).
-
-## Acknowledgements
-
-Pitcher wouldn't be possible without the contributions of the following individuals:
-
-- [Leonardo Zamariola](https://github.com/zamariola): Maintainer.
+	switch *envVar {
+	case "dev":
+		fmt.Println("Using Dev environment")
+		env = dev
+	}
+	return env
+}
