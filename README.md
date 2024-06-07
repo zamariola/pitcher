@@ -1,6 +1,6 @@
 # Pitcher
 
-![Pitcher Logo](link-to-your-logo.png)
+![Pitcher Logo](https://github.com/zamariola/pitcher/blob/eb35ebd720043189e30fb0002354ab79f688f845/docs/pitcher-mascot.png)
 
 Pitcher is an open-source API caller tool designed to simplify the process of making HTTP requests and testing APIs. Similar to Postman, it provides a user-friendly programatic interface for crafting requests, inspecting responses, and organizing your API workflow.
 
