@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"testing"
 
 	"github.com/google/uuid"
 )
@@ -37,9 +38,21 @@ type Step struct {
 	PostProcs  []PostProcessorFunc
 }
 
-func NewStep(request *Request) Step {
+func (s Step) WithPreProcessors(preProcessors ...PreProcessorFunc) Step {
 	return Step{
-		Request: request,
+		Request:    s.Request,
+		Assertions: s.Assertions,
+		PostProcs:  s.PostProcs,
+		PreProcs:   preProcessors,
+	}
+}
+
+func (s Step) WithPostProcessors(postProcessors ...PostProcessorFunc) Step {
+	return Step{
+		Request:    s.Request,
+		Assertions: s.Assertions,
+		PostProcs:  postProcessors,
+		PreProcs:   s.PreProcs,
 	}
 }
 
@@ -50,6 +63,58 @@ type Request struct {
 	Body        string
 	ContentType string
 	Headers     http.Header
+}
+
+func Success(request *Request) Step {
+	return Step{
+		Request: request,
+		Assertions: []AssertionFunc{
+			SuccessAssertion,
+		},
+	}
+}
+
+func GET(path string) Step {
+	return Success(&Request{
+		Method: "GET",
+		Path:   path,
+	})
+}
+
+func POST(path string, body string, contentType string) Step {
+	return Success(&Request{
+		Method:      "POST",
+		Path:        path,
+		Body:        body,
+		ContentType: contentType,
+	})
+}
+
+func PUT(path string, body string, contentType string) Step {
+	return Success(
+		&Request{
+			Method:      "PUT",
+			Path:        path,
+			Body:        body,
+			ContentType: contentType,
+		})
+}
+
+func PATCH(path string, body string, contentType string) Step {
+	return Success(
+		&Request{
+			Method:      "PATCH",
+			Path:        path,
+			Body:        body,
+			ContentType: contentType,
+		})
+}
+
+func DELETE(path string, body string, contentType string) Step {
+	return Success(&Request{
+		Method: "DELETE",
+		Path:   path,
+	})
 }
 
 type Response struct {
@@ -119,10 +184,35 @@ func (c *Client) Do(steps ...Step) error {
 	return nil
 }
 
+func (c *Client) Test(t *testing.T, steps ...Step) {
+
+	err := c.Do(steps...)
+
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func (c *Client) runStep(step Step) error {
 
 	//Prepare the request
 	req := step.Request
+
+	if req.Headers == nil {
+		req.Headers = http.Header{}
+	}
+
+	//Global PreProcessors
+	for _, proc := range c.globalPreProcs {
+		proc(req, c.session)
+	}
+
+	//PreProcessors
+	for _, proc := range step.PreProcs {
+		proc(req, c.session)
+	}
+
+	//String parsers
 
 	var parsers = []StringParserFunc{
 		parseUUID,
@@ -133,15 +223,6 @@ func (c *Client) runStep(step Step) error {
 		req.Body = parser(req.Body)
 		req.Host = parser(req.Host)
 		req.Path = parser(req.Path)
-	}
-
-	if req.Headers == nil {
-		req.Headers = http.Header{}
-	}
-
-	//PreProcessors
-	for _, proc := range step.PreProcs {
-		proc(req, c.session)
 	}
 
 	//Fallback null/invalid host to session variables

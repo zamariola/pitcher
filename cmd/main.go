@@ -44,27 +44,22 @@ func main() {
 	)
 
 	err := client.Do(
-		pitcher.Step{
-
-			//Request definition (method, path, payload, headers)
-			Request: &pitcher.Request{
-				Method: "GET",
-				Path:   "/posts",
-			},
-
-			//Assertions after execution
-			Assertions: []pitcher.AssertionFunc{
-				pitcher.SuccessAssertion,
-			},
-
-			PostProcs: []pitcher.PostProcessorFunc{
-
+		//Fluent API to create a request
+		//pitcher.GET("<ur>").WithPreProcessors(...PreProcessors).WithPostProcessors(...PostProcessors)
+		pitcher.GET("/posts").
+			// Pre processors that prepares the session or update the request before the execution
+			WithPreProcessors(
+				pitcher.UpdateSession("jwtToken", "eyJhbGciOiJIUzI1NiIsInR5cC..."),
+				pitcher.JWTAuth,
+			).
+			WithPostProcessors(
 				//Post processor that extracts the json value from the path 0.id to the session
 				//variable named "id" so it can be reused in the later steps
 				//The path extraction is using https://github.com/tidwall/gjson notation
 				pitcher.Extract("id", "0.id"),
-			},
-		},
+			),
+
+		//Manually creating the step and the request
 		pitcher.Step{
 			Request: &pitcher.Request{
 				Method: "GET",
@@ -76,26 +71,21 @@ func main() {
 				pitcher.SuccessAssertion,
 			},
 		},
-		pitcher.Step{
 
-			//Post request using the body
-			//The content-type: application/json is the default if no other is informed
-			Request: &pitcher.Request{
-				Method: "POST",
-				Path:   "/posts",
-				Body:   `{"title": "Michael G Scott", "body": "Regional Manager ${randomUUID}", "userId": 1 }`,
-			},
-			Assertions: []pitcher.AssertionFunc{
-				pitcher.SuccessAssertion,
-			},
-			PreProcs: []pitcher.PreProcessorFunc{},
-			PostProcs: []pitcher.PostProcessorFunc{
+		//pitcher.POST("<url>",<body>, <contentType>)
+		pitcher.POST(
+			"/posts",
+			`{"title": "Michael G Scott", "body": "Regional Manager ${randomUUID}", "userId": 1 }`,
+			"application/json",
+		).WithPreProcessors(
+			pitcher.JWTAuth,
+		).WithPostProcessors(
+			//Post processor extracting the id again and overriding the previous value
+			pitcher.Extract("id", "id"),
 
-				//Post processor extracting the id again and overriding the previous value
-				pitcher.Extract("id", "id"),
-				pitcher.LogPayloadProcessor,
-			},
-		},
+			//Post processor logging the entire payload response
+			pitcher.LogPayloadProcessor,
+		),
 		pitcher.Step{
 			Request: &pitcher.Request{
 				Method: "GET",

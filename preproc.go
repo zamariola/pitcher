@@ -14,3 +14,10 @@ func JWTAuth(req *Request, session Session) error {
 	req.Headers.Add(authorizationKey, "Bearer "+jwt)
 	return nil
 }
+
+func UpdateSession(key, value string) func(*Request, Session) error {
+	return func(r *Request, s Session) error {
+		s.Put(key, value)
+		return nil
+	}
+}
