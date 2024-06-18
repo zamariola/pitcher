@@ -61,6 +61,7 @@ type Request struct {
 	Host        string
 	Path        string
 	Body        string
+	Query       map[string]string
 	ContentType string
 	Headers     http.Header
 }
@@ -78,6 +79,7 @@ func GET(path string) Step {
 	return Success(&Request{
 		Method: "GET",
 		Path:   path,
+		Query:  map[string]string{},
 	})
 }
 
@@ -87,6 +89,7 @@ func POST(path string, body string, contentType string) Step {
 		Path:        path,
 		Body:        body,
 		ContentType: contentType,
+		Query:       map[string]string{},
 	})
 }
 
@@ -97,6 +100,7 @@ func PUT(path string, body string, contentType string) Step {
 			Path:        path,
 			Body:        body,
 			ContentType: contentType,
+			Query:       map[string]string{},
 		})
 }
 
@@ -107,6 +111,7 @@ func PATCH(path string, body string, contentType string) Step {
 			Path:        path,
 			Body:        body,
 			ContentType: contentType,
+			Query:       map[string]string{},
 		})
 }
 
@@ -114,6 +119,7 @@ func DELETE(path string, body string, contentType string) Step {
 	return Success(&Request{
 		Method: "DELETE",
 		Path:   path,
+		Query:  map[string]string{},
 	})
 }
 
@@ -223,6 +229,11 @@ func (c *Client) runStep(step Step) error {
 		req.Body = parser(req.Body)
 		req.Host = parser(req.Host)
 		req.Path = parser(req.Path)
+
+		for k, v := range req.Query {
+			req.Query[k] = parser(v)
+		}
+
 	}
 
 	//Fallback null/invalid host to session variables
@@ -251,6 +262,16 @@ func (c *Client) runStep(step Step) error {
 
 	request, err := http.NewRequest(req.Method, urlP, reqBody)
 	request.Header = req.Headers
+
+	//Add Query params
+	if len(req.Query) > 0 {
+		params := url.Values{}
+
+		for key, val := range req.Query {
+			params.Add(key, val)
+		}
+		request.URL.RawQuery = params.Encode()
+	}
 
 	if len(req.ContentType) > 0 {
 		request.Header.Add(contentType, contentApplicationJson)

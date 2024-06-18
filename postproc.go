@@ -1,7 +1,9 @@
 package pitcher
 
 import (
+	"encoding/json"
 	"log/slog"
+	"strings"
 
 	"github.com/tidwall/gjson"
 )
@@ -12,7 +14,19 @@ func LogStepProcessor(req *Request, resp *Response, session Session) error {
 }
 
 func LogPayloadProcessor(req *Request, resp *Response, session Session) error {
-	slog.Info("Executing", "method", req.Method, "path", req.Path, "statusCode", resp.StatusCode, "body", resp.Body)
+
+	if strings.Contains(resp.Headers.Get("Content-Type"), "application/json") {
+		var rawJSON interface{}
+		json.Unmarshal([]byte(resp.Body), &rawJSON)
+
+		formattedJSON, _ := json.MarshalIndent(rawJSON, "", "  ")
+
+		slog.Info("Response payload: " + string(formattedJSON))
+		return nil
+
+	}
+
+	slog.Info("Response payload: " + resp.Body)
 	return nil
 }
 
