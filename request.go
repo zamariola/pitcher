@@ -180,26 +180,32 @@ func NewCustomClient(
 	}
 }
 
-func (c *Client) Do(steps ...Step) error {
+func (c *Client) Do(steps ...Step) ([]*Response, error) {
+
+	responses := []*Response{}
 
 	for _, step := range steps {
-		if err := c.runStep(step); err != nil {
-			return err
+		r, err := c.runStep(step)
+
+		if err != nil {
+			return responses, err
 		}
+		responses = append(responses, r)
 	}
-	return nil
+	return responses, nil
 }
 
-func (c *Client) Test(t *testing.T, steps ...Step) {
+func (c *Client) Test(t *testing.T, steps ...Step) []*Response {
 
-	err := c.Do(steps...)
+	r, err := c.Do(steps...)
 
 	if err != nil {
 		t.Error(err)
 	}
+	return r
 }
 
-func (c *Client) runStep(step Step) error {
+func (c *Client) runStep(step Step) (*Response, error) {
 
 	//Prepare the request
 	req := step.Request
@@ -246,7 +252,7 @@ func (c *Client) runStep(step Step) error {
 	urlP, err := url.JoinPath(host, req.Path)
 
 	if err != nil {
-		return err
+		return &Response{}, err
 	}
 
 	//Do the request
@@ -278,18 +284,18 @@ func (c *Client) runStep(step Step) error {
 	}
 
 	if err != nil {
-		return err
+		return &Response{}, err
 	}
 
 	resp, err := c.client.Do(request)
 	if err != nil {
-		return err
+		return &Response{}, err
 	}
 
 	respBody, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
-		return err
+		return &Response{}, err
 	}
 
 	response := &Response{
@@ -301,25 +307,25 @@ func (c *Client) runStep(step Step) error {
 	//Global Post Processors
 	for _, proc := range c.globalPostProcs {
 		if err := proc(req, response, c.session); err != nil {
-			return err
+			return response, err
 		}
 	}
 
 	//Post processors
 	for _, proc := range step.PostProcs {
 		if err := proc(req, response, c.session); err != nil {
-			return err
+			return response, err
 		}
 	}
 
 	//Assertions
 	for _, proc := range step.Assertions {
 		if valid := proc(response); !valid {
-			return errors.New("invalid response for assertion")
+			return response, errors.New("invalid response for assertion")
 		}
 	}
 
-	return nil
+	return response, nil
 }
 
 func (c *Client) parseSessionKeys(body string) string {
