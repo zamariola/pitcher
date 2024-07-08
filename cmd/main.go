@@ -43,7 +43,7 @@ func main() {
 		},
 	)
 
-	err := client.Do(
+	_, err := client.Do(
 		//Fluent API to create a request
 		//pitcher.GET("<ur>").WithPreProcessors(...PreProcessors).WithPostProcessors(...PostProcessors)
 		pitcher.GET("/posts").
