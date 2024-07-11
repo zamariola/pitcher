@@ -180,6 +180,11 @@ func NewCustomClient(
 	}
 }
 
+func (c *Client) SetTransport(t *http.Transport) *Client {
+	c.client.Transport = t
+	return c
+}
+
 func (c *Client) Do(steps ...Step) ([]*Response, error) {
 
 	responses := []*Response{}
