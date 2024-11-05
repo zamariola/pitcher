@@ -2,10 +2,15 @@ package pitcher
 
 import (
 	"errors"
+	"flag"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
@@ -22,6 +27,8 @@ const (
 	contentApplicationJson = "application/json"
 	contentType            = "Content-Type"
 )
+
+var verbose int
 
 type PreProcessorFunc func(*Request, Session) error
 
@@ -134,14 +141,16 @@ type Client struct {
 	session         Session
 	globalPreProcs  []PreProcessorFunc
 	globalPostProcs []PostProcessorFunc
+	namedSteps      map[string]Step
 }
 
 func NewClient() *Client {
 	s := NewMemoryRWSession(make(map[string]string))
 
 	return &Client{
-		client:  http.DefaultClient,
-		session: s,
+		client:     http.DefaultClient,
+		session:    s,
+		namedSteps: map[string]Step{},
 	}
 }
 
@@ -177,12 +186,78 @@ func NewCustomClient(
 		session:         session,
 		globalPreProcs:  preProcs,
 		globalPostProcs: postProcs,
+		namedSteps:      map[string]Step{},
 	}
 }
 
 func (c *Client) SetTransport(t *http.Transport) *Client {
 	c.client.Transport = t
 	return c
+}
+
+func (c *Client) Add(id string, step Step) {
+	c.namedSteps[id] = step
+}
+
+func (c *Client) Parse() {
+
+	sessionValues := make(KeyValuePairs)
+	flag.Var(sessionValues, "s", "Specify session key=value pairs")
+	flag.IntVar(&verbose, "v", 1, "set verbose log level (0=response only; 1=info; 2+=debug)")
+	flag.Parse()
+
+	//setting log level
+
+	var level = slog.LevelInfo
+
+	if verbose == 0 {
+		level = slog.LevelError
+	} else if verbose >= 2 {
+		level = slog.LevelDebug
+	}
+	opts := &slog.HandlerOptions{
+		Level: level,
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
+	slog.SetDefault(logger)
+	cmdSteps := flag.Args()
+
+	if len(cmdSteps) == 0 {
+		keys := make([]string, 0, len(c.namedSteps))
+
+		for k := range c.namedSteps {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		slog.Info("No step(s) provided. Please provide at least on step:")
+
+		for _, v := range keys {
+			slog.Info(v)
+		}
+		return
+	}
+
+	// add cmd session values
+	for k, v := range sessionValues {
+		c.session.Put(k, v)
+	}
+
+	// do the sequential call
+	steps := make([]Step, 0)
+
+	for _, v := range cmdSteps {
+		s, ok := c.namedSteps[v]
+
+		if !ok {
+			slog.Error("Unable to find provided step", "step", v)
+			os.Exit(1)
+		}
+		steps = append(steps, s)
+	}
+
+	slog.Debug("Executing request", "steps", cmdSteps, "session", c.session)
+	c.Do(steps...)
 }
 
 func (c *Client) Do(steps ...Step) ([]*Response, error) {
@@ -350,6 +425,25 @@ func (c *Client) parseSessionKeys(body string) string {
 	}
 
 	return body
+}
+
+type KeyValuePairs map[string]string
+
+func (kv KeyValuePairs) String() string {
+	var pairs []string
+	for k, v := range kv {
+		pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
+	}
+	return strings.Join(pairs, ", ")
+}
+
+func (kv KeyValuePairs) Set(value string) error {
+	parts := strings.SplitN(value, "=", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid format, expected key=value")
+	}
+	kv[parts[0]] = parts[1]
+	return nil
 }
 
 func parseUUID(body string) string {

@@ -2,6 +2,7 @@ package pitcher
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -21,12 +22,12 @@ func LogPayloadProcessor(req *Request, resp *Response, session Session) error {
 
 		formattedJSON, _ := json.MarshalIndent(rawJSON, "", "  ")
 
-		slog.Info("Response payload: " + string(formattedJSON))
+		fmt.Println(string(formattedJSON))
 		return nil
 
 	}
 
-	slog.Info("Response payload: " + resp.Body)
+	fmt.Println(resp.Body)
 	return nil
 }
 
